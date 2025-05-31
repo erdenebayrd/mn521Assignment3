@@ -1,0 +1,11 @@
+---
+- name: Configure PC IPs and routes
+  hosts: pcs
+  become: yes
+  tasks:
+
+    - name: Assign IP address
+      ansible.builtin.shell: |
+        ip addr add {{ ansible_host }}/24 dev eth0
+        ip link set eth0 up
+        ip route add default via 192.168.20.1
