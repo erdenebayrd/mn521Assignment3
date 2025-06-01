@@ -1,0 +1,26 @@
+---
+- name: Configure Alpine Servers and Install Apache
+  hosts: servers
+  become: yes
+  tasks:
+    - name: Assign static IP address
+      ansible.builtin.command: ip addr add {{ ip_address }}/24 dev eth0
+      args:
+        warn: false
+      ignore_errors: yes
+
+    - name: Bring interface eth0 up
+      ansible.builtin.command: ip link set dev eth0 up
+
+    - name: Set default gateway
+      ansible.builtin.command: ip route add default via {{ gateway }}
+      ignore_errors: yes
+
+    - name: Install Apache (httpd)
+      ansible.builtin.command: apk add --no-cache apache2
+
+    - name: Start Apache server
+      ansible.builtin.command: rc-service apache2 start
+
+    - name: Enable Apache to start on boot
+      ansible.builtin.command: rc-update add apache2 default

@@ -1,0 +1,28 @@
+---
+- name: Configure Router R1 interfaces and ACL firewall
+  hosts: routers
+  gather_facts: no
+  tasks:
+
+    - name: Configure FastEthernet0/0 (connected to Server network)
+      ios_config:
+        lines:
+          - interface FastEthernet0/0
+          - ip address 192.168.1.1 255.255.255.0
+          - no shutdown
+
+    - name: Configure FastEthernet1/0 (connected to PC network)
+      ios_config:
+        lines:
+          - interface FastEthernet1/0
+          - ip address 192.168.20.1 255.255.255.0
+          - no shutdown
+
+    - name: Configure basic ACL to block ICMP from PC network to servers
+      ios_config:
+        lines:
+          - ip access-list extended BLOCK_ICMP
+          - deny icmp 192.168.20.0 0.0.0.255 192.168.1.0 0.0.0.255
+          - permit ip any any
+          - interface FastEthernet1/0
+          - ip access-group BLOCK_ICMP in
