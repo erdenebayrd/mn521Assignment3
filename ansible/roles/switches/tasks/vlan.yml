@@ -1,0 +1,17 @@
+---
+- name: Create VLANs
+  ios_vlan:
+    vlan_id: "{{ item.id }}"
+    name: "{{ item.name }}"
+    state: present
+  loop: "{{ vlans }}"
+  tags: vlan
+
+- name: Configure access ports
+  ios_config:
+    lines:
+      - interface range FastEthernet {{ item.ports }}
+      - switchport mode access
+      - switchport access vlan {{ item.id }}
+  loop: "{{ vlans }}"
+  tags: ports

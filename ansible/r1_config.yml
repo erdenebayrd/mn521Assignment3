@@ -1,28 +1,82 @@
 ---
-- name: Configure Router R1 interfaces and ACL firewall
+- name: Configure Router R1 - Base Setup
   hosts: routers
   gather_facts: no
-  tasks:
+  vars:
+    ospf_networks:
+      - { network: "192.168.1.0", wildcard: "0.0.0.255", area: 0 }
+      - { network: "192.168.20.0", wildcard: "0.0.0.255", area: 0 }
+    dhcp_config:
+      pool_name: "PC_POOL"
+      network: "192.168.20.0 255.255.255.0"
+      gateway: "192.168.20.1"
+      dns_servers: ["8.8.8.8", "8.8.4.4"]
+      lease_time: 86400
 
-    - name: Configure FastEthernet0/0 (connected to Server network)
+  tasks:
+    # INTERFACE CONFIGURATION
+    - name: Configure FastEthernet0/0 (Server Network)
       ios_config:
         lines:
           - interface FastEthernet0/0
           - ip address 192.168.1.1 255.255.255.0
           - no shutdown
+        save_when: changed
 
-    - name: Configure FastEthernet1/0 (connected to PC network)
+    - name: Configure FastEthernet1/0 (PC Network)
       ios_config:
         lines:
           - interface FastEthernet1/0
           - ip address 192.168.20.1 255.255.255.0
           - no shutdown
+        save_when: changed
 
-    - name: Configure basic ACL to block ICMP from PC network to servers
+    # OSPF CONFIGURATION (FIXED JINJA2 SYNTAX)
+    - name: Configure OSPF Routing
       ios_config:
-        lines:
-          - ip access-list extended BLOCK_ICMP
-          - deny icmp 192.168.20.0 0.0.0.255 192.168.1.0 0.0.0.255
-          - permit ip any any
-          - interface FastEthernet1/0
-          - ip access-group BLOCK_ICMP in
+        lines: |
+          router ospf 1
+          auto-cost reference-bandwidth 1000
+          log-adjacency-changes detail
+          {% for net in ospf_networks %}
+          network {{ net.network }} {{ net.wildcard }} area {{ net.area }}
+          {% endfor %}
+          passive-interface default
+          no passive-interface FastEthernet0/0
+        save_when: changed
+      tags: ospf
+
+    # DHCP CONFIGURATION
+    - name: Configure DHCP Pool
+      ios_config:
+        lines: |
+          ip dhcp excluded-address 192.168.20.1 192.168.20.10
+          ip dhcp pool {{ dhcp_config.pool_name }}
+          network {{ dhcp_config.network }}
+          default-router {{ dhcp_config.gateway }}
+          {% for dns in dhcp_config.dns_servers %}
+          dns-server {{ dns }}
+          {% endfor %}
+          lease {{ dhcp_config.lease_time }}
+        save_when: changed
+      tags: dhcp
+
+    # SECURITY CONFIGURATION
+    - name: Secure Management Plane
+      ios_config:
+        lines: |
+          access-list 110 permit tcp host 192.168.1.10 host 192.168.1.1 eq 22
+          access-list 110 deny ip any any log
+          line vty 0 4
+          access-class 110 in
+          transport input ssh
+        save_when: changed
+      tags: security
+
+    # CONFIG BACKUP
+    - name: Backup Running Config
+      ios_config:
+        backup: yes
+        backup_options:
+          filename: "../backups/{{ inventory_hostname }}_{{ ansible_date_time.date }}.cfg"
+      tags: backup

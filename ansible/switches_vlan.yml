@@ -1,0 +1,14 @@
+---
+- name: Configure VLANs
+  hosts: switches
+  vars:
+    vlans:
+      - { id: 10, name: Servers, ports: "1-10" }
+      - { id: 20, name: PCs, ports: "11-20" }
+  tasks:
+    - name: Create VLANs
+      ios_vlan:
+        vlan_id: "{{ item.id }}"
+        name: "{{ item.name }}"
+        state: present
+      loop: "{{ vlans }}"
