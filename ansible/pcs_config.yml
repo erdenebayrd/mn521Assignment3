@@ -1,11 +1,15 @@
 ---
-- name: Configure PC IPs and routes
+- name: Configure PCs
   hosts: pcs
   become: yes
   tasks:
+    - name: Install DHCP client (Alpine)
+      apk:
+        name: dhcpcd
+        state: present
+      when: ansible_os_family == "Alpine"
 
-    - name: Assign IP address
-      ansible.builtin.shell: |
-        ip addr add {{ ansible_host }}/24 dev eth0
-        ip link set eth0 up
-        ip route add default via 192.168.20.1
+    - name: Start DHCP client
+      command: dhcpcd eth0
+      async: 30
+      poll: 0

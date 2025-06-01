@@ -1,0 +1,25 @@
+---
+- name: Validate network scalability
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Check VLAN capacity
+      ios_command:
+        commands: show vlan brief
+      register: vlan_output
+      when: "'switches' in group_names"
+      failed_when: "vlan_output.stdout_lines[0] | length > 100"
+
+    - name: Verify OSPF neighbors
+      ios_command:
+        commands: show ip ospf neighbor
+      register: ospf_out
+      when: "'routers' in group_names"
+      failed_when: "'FULL' not in ospf_out.stdout"
+
+    - name: Check server load
+      command: uptime
+      register: uptime
+      when: "'servers' in group_names"
+      changed_when: false
+      failed_when: "float(uptime.stdout.split()[-3]) > 1.0"
